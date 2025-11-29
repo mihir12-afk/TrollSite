@@ -1,0 +1,11 @@
+# Python junk
+__pycache__/
+*.pyc
+venv/
+
+# Node junk
+node_modules/
+build/
+
+# Docker junk
+.env

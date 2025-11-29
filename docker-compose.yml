@@ -1,0 +1,77 @@
+version: '3.8'
+
+# 1. Define a shared network for all containers to talk
+networks:
+  troll-net:
+    driver: bridge
+
+services:
+  # --- The Database ---
+  db:
+    image: mysql:5.7
+    container_name: troll_db
+    networks:
+      - troll-net
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: mihir_troll_db
+    # External Port: 3307, Internal: 3306 (Prevents conflict with your PC)
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./database:/docker-entrypoint-initdb.d
+    # FIX: We added '-ppassword' so the healthcheck can log in
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      timeout: 20s
+      retries: 10
+
+  # --- User Service (Auth & Wallet) ---
+  user_service:
+    build: ./user_service
+    container_name: troll_user
+    networks:
+      - troll-net
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      # Connects to 'db' container using the password
+      - DATABASE_URL=mysql+pymysql://root:password@db/mihir_troll_db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python app.py
+
+  # --- Toll Service (Transactions) ---
+  toll_service:
+    build: ./toll_service
+    container_name: troll_toll
+    networks:
+      - troll-net
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - DATABASE_URL=mysql+pymysql://root:password@db/mihir_troll_db
+      - USER_SERVICE_URL=http://user_service:5001
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python app.py
+
+  # --- Frontend (React) ---
+  client:
+    build: ./client
+    container_name: troll_client
+    networks:
+      - troll-net
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - user_service
+      - toll_service
