@@ -1,0 +1,53 @@
+name: Build and Push to Docker Hub
+
+# TRIGGER: When does this run?
+on:
+  push:
+    branches: [ "master", "main" ]
+
+# JOBS: What actually happens?
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest  # GitHub rents us a Linux server for free!
+
+    steps:
+    # 1. Download the code from the repo
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Login to Docker Hub (Using the secrets you saved)
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # 3. Build & Push User Service
+    - name: Build and Push User Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./user_service
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/troll-user:latest
+          ${{ secrets.DOCKER_USERNAME }}/troll-user:${{ github.sha }}
+
+    # 4. Build & Push Toll Service
+    - name: Build and Push Toll Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./toll_service
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/troll-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/troll-service:${{ github.sha }}
+
+    # 5. Build & Push Client
+    - name: Build and Push Client
+      uses: docker/build-push-action@v4
+      with:
+        context: ./client
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/troll-client:latest
+          ${{ secrets.DOCKER_USERNAME }}/troll-client:${{ github.sha }}
